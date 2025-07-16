@@ -1,0 +1,71 @@
+name: Build and Publish
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-push:
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+      packages: write
+      attestations: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3.6.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.11.1
+
+      - name: Extract base image tag
+        id: tag
+        run: |
+          TAG=$(grep '^FROM pulumi' Dockerfile | cut -d':' -f2)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Extract Docker metadata
+        uses: docker/metadata-action@v5.7.0
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.tag.outputs.tag }},enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+            type=sha,format=short
+          flavor: |
+            latest=${{ github.ref == format('refs/heads/{0}', 'main') }}
+          labels: |
+            org.opencontainers.image.authors=Jan Sauer <jan@jansauer.de>
+            org.opencontainers.image.base.name=docker.io/pulumi/pulumi-nodejs:${{ steps.tag.outputs.tag }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6.18.0
+        id: build-push
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+          push: ${{ github.ref == format('refs/heads/{0}', 'main') }}
+        env:
+          SOURCE_DATE_EPOCH: 0
+
+      - name: Attestation
+        uses: actions/attest-build-provenance@v2.4.0
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.build-push.outputs.digest }}
+          push-to-registry: true
