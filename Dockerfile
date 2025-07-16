@@ -1,4 +1,4 @@
-FROM pulumi/pulumi-nodejs:3.148.0
+FROM pulumi/pulumi-nodejs:3.182.0
 
 RUN apt-get update && \
     apt-get install -y python3 && \
