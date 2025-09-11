@@ -5,7 +5,7 @@ RUN apt-get update && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /cloud.google.gpg
 
     
-FROM pulumi/pulumi-nodejs:3.193.0
+FROM pulumi/pulumi-nodejs:3.194.0
 
 COPY --from=keyring /cloud.google.gpg /usr/share/keyrings/cloud.google.gpg
 
